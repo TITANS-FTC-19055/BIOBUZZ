@@ -5,5 +5,7 @@ public class HardwareConfig {
     public static final String LF = "LF";
     public static final String RB = "RB";
     public static final String LB = "LB";
+    public static final String intake = "Intake";
+    public static final String transfer = "Transfer";
 
 }

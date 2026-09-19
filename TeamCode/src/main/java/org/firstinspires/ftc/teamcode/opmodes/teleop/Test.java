@@ -39,8 +39,6 @@ public class Test extends LinearOpMode {
             if(controller1.square.isDown()) drivetrain.turnLeft(0.5);
             if(controller1.circle.isDown()) drivetrain.turnRight(0.5);
 
-
-
             robot.update();
             telemetry.update();
         }
