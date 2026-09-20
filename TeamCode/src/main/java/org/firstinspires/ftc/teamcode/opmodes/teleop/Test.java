@@ -18,8 +18,6 @@ public class Test extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
         robot = new Robot(hardwareMap);
 
-        drivetrain = new Drivetrain(hardwareMap, true);
-
         controller1 = new Controller(gamepad1);
         controller2 = new Controller(gamepad2);
 
@@ -29,15 +27,7 @@ public class Test extends LinearOpMode {
             controller1.update();
             controller2.update();
 
-            drivetrain.driveFieldCentric(-controller1.leftStickY, controller1.leftStickX, controller1.rightStickX);
-
-            if(controller1.dpadUp.isDown()) drivetrain.forwardStrafeRight(0.5);
-            if(controller1.dpadDown.isDown()) drivetrain.forwardStrafeLeft(0.5);
-            if(controller1.dpadLeft.isDown()) drivetrain.backwardStrafeRight(0.5);
-            if(controller1.dpadRight.isDown()) drivetrain.backwardStrafeLeft(0.5);
-
-            if(controller1.square.isDown()) drivetrain.turnLeft(0.5);
-            if(controller1.circle.isDown()) drivetrain.turnRight(0.5);
+            robot.drivetrain.driveFieldCentric(-controller1.leftStickX, controller1.leftStickY, controller1.rightStickX);
 
             robot.update();
             telemetry.update();
