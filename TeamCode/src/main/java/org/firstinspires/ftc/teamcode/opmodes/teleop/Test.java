@@ -28,8 +28,10 @@ public class Test extends LinearOpMode {
             controller2.update();
 
             robot.drivetrain.driveFieldCentric(-controller1.leftStickX, controller1.leftStickY, controller1.rightStickX);
-
             robot.update();
+            if(controller1.circle.isPressed()) robot.setState(Robot.ROBOT_STATES.COLLECTING);
+
+            if(gamepad1.right_bumper) robot.setState(Robot.ROBOT_STATES.SHOOTING);
             telemetry.update();
         }
     }
