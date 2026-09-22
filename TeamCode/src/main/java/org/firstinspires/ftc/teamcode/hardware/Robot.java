@@ -26,9 +26,13 @@ public class Robot implements Updateable {
         intake.update();
         turret.update();
     }
+
     public void setState(RobotState state){
-        if(this.state == state) this.state = RobotState.IDLE;
-        else this.state = state;
+        this.state = state;
+    }
+
+    public RobotState getState(){
+        return state;
     }
 
 }

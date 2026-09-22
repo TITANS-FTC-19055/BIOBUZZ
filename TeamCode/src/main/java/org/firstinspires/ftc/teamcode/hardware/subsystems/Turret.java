@@ -16,8 +16,7 @@ import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
 public class Turret implements Updateable {
 
-        private final DcMotorEx launch1, launch2, rotation_encoder;
-        private final CRServo hrot1, hrot2;
+        private final DcMotorEx motor1, motor2;
         private final VoltageSensor voltageSensor;
 
         public static double ks = 0, kv = 0.00055, ka = 100, kp = 0.008;
@@ -35,29 +34,29 @@ public class Turret implements Updateable {
         private final PIDController controller;
         private final SimpleMotorFeedforward feedforward;
 
-        public Turret(@NonNull HardwareMap hwmap) {
-            launch1 = hwmap.get(DcMotorEx.class, HardwareConfig.launch1);
-            launch2 = hwmap.get(DcMotorEx.class, HardwareConfig.launch2);
+        private final TurretHRot hrot;
 
-            hrot1 = hwmap.get(CRServo.class, HardwareConfig.hrot1);
-            hrot2 = hwmap.get(CRServo.class, HardwareConfig.hrot2);
-            rotation_encoder = hwmap.get(DcMotorEx.class, HardwareConfig.rotation_encoder);
+        public Turret(@NonNull HardwareMap hwmap) {
+            motor1 = hwmap.get(DcMotorEx.class, HardwareConfig.launch1);
+            motor2 = hwmap.get(DcMotorEx.class, HardwareConfig.launch2);
 
             this.voltageSensor = hwmap.getAll(VoltageSensor.class).get(0);
 
-            launch1.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
-            launch1.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
+            motor1.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
+            motor1.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
 
-            launch2.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
-            launch2.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
+            motor2.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
+            motor2.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
 
-            launch1.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
-            launch2.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
+            motor1.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
+            motor2.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
 
-            launch2.setDirection(DcMotorSimple.Direction.REVERSE);
+            motor2.setDirection(DcMotorSimple.Direction.REVERSE);
 
             controller = new PIDController(kp, 0, 0);
             feedforward = new SimpleMotorFeedforward(ks, kv, ka);
+
+            hrot = new TurretHRot(hwmap);
 
             state = ShootingState.OFF;
         }
@@ -65,7 +64,7 @@ public class Turret implements Updateable {
         @Override
         public void update() {
             voltage = voltageSensor.getVoltage();
-            currentVelocity = launch1.getVelocity();
+            currentVelocity = motor1.getVelocity();
 
 //            controller.setPID(kp, 0, 0);
 
@@ -90,6 +89,8 @@ public class Turret implements Updateable {
                     break;
             }
 
+            hrot.update();
+
         }
 
         private double calculateMotorPower(){
@@ -104,13 +105,13 @@ public class Turret implements Updateable {
         }
 
         private void setMotorPower(double power){
-            launch1.setPower(power);
-            launch2.setPower(power);
+            motor1.setPower(power);
+            motor2.setPower(power);
         }
 
         private void stopMotors(){
-            launch1.setPower(0);
-            launch2.setPower(0);
+            motor1.setPower(0);
+            motor2.setPower(0);
             controller.reset();
         }
 
@@ -130,8 +131,8 @@ public class Turret implements Updateable {
             return Math.abs(currentVelocity - targetVelocity) <= error;
         }
 
-        public void setHorizontalAngle(double angleInDegrees){
-            rotation_target = (8192*angleInDegrees)/360;
+        public void setHRotAngle(double angle){
+            hrot.setTargetAngle(angle);
         }
 
-    }
+}
