@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.hardware.subsystems;
 
 import androidx.annotation.NonNull;
 
+import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -16,8 +17,8 @@ import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
 public class Turret implements Updateable {
 
-        private final DcMotorEx launch1, launch2;
-        private final Servo hrot1, hrot2;
+        private final DcMotorEx launch1, launch2, rotation_encoder;
+        private final CRServo hrot1, hrot2;
         private final VoltageSensor voltageSensor;
 
         public static double ks = 0, kv = 0.00055, ka = 100, kp = 0.008;
@@ -27,18 +28,22 @@ public class Turret implements Updateable {
         public double voltage = 12.0;
         public final double nominalVoltage = 12.0;
 
+        public double ticksPerRotation = 8192;
+        public double rotation_target = 0;
+
         private ShootingState state;
 
         private final PIDController controller;
         private final SimpleMotorFeedforward feedforward;
 
         public Turret(@NonNull HardwareMap hwmap) {
+            rotation_encoder = hwmap.get(DcMotorEx.class, HardwareConfig.rotation_encoder);
             launch1 = hwmap.get(DcMotorEx.class, HardwareConfig.launch1);
             launch2 = hwmap.get(DcMotorEx.class, HardwareConfig.launch2);
-            
-            hrot1 = hwmap.get(Servo.class, HardwareConfig.hrot1);
-            hrot2 = hwmap.get(Servo.class, HardwareConfig.hrot2);
-            
+
+            hrot1 = hwmap.get(CRServo.class, HardwareConfig.hrot1);
+            hrot2 = hwmap.get(CRServo.class, HardwareConfig.hrot2);
+
             this.voltageSensor = hwmap.getAll(VoltageSensor.class).get(0);
 
             launch1.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
@@ -57,7 +62,7 @@ public class Turret implements Updateable {
 
             state = ShootingState.OFF;
         }
-        
+
         @Override
         public void update() {
             voltage = voltageSensor.getVoltage();
@@ -125,5 +130,11 @@ public class Turret implements Updateable {
         public boolean isAtTargetVelocity(double error){
             return Math.abs(currentVelocity - targetVelocity) <= error;
         }
+
+        public void setHorizontalAngle(double angleInDegrees){
+            rotation_target = (8192*angleInDegrees)/360;
+        }
+
+
 
     }
