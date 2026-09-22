@@ -2,11 +2,11 @@ package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.IMU;
 
 import org.firstinspires.ftc.teamcode.hardware.Robot;
 import org.firstinspires.ftc.teamcode.hardware.subsystems.Drivetrain;
 import org.firstinspires.ftc.teamcode.lib.control.Controller;
+import org.firstinspires.ftc.teamcode.config.RobotConstants.RobotState;
 
 @TeleOp
 public class Test extends LinearOpMode {
@@ -28,10 +28,11 @@ public class Test extends LinearOpMode {
             controller2.update();
 
             robot.drivetrain.driveFieldCentric(-controller1.leftStickX, controller1.leftStickY, controller1.rightStickX);
-            robot.update();
-            if(controller1.circle.isPressed()) robot.setState(Robot.ROBOT_STATES.COLLECTING);
 
-            if(gamepad1.right_bumper) robot.setState(Robot.ROBOT_STATES.SHOOTING);
+            if(controller1.circle.isPressed()) robot.setState(RobotState.COLLECTING);
+            if(gamepad1.right_bumper) robot.setState(RobotState.SHOOTING);
+
+            robot.update();
             telemetry.update();
         }
     }

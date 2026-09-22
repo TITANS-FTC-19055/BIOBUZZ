@@ -7,8 +7,9 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
 import org.firstinspires.ftc.teamcode.config.RobotConstants.IntakeState;
+import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
-public class Intake {
+public class Intake implements Updateable {
     private final DcMotor intake, transfer;
     private IntakeState currentState = IntakeState.OFF;
     private IntakeState lastState = null;
@@ -21,14 +22,6 @@ public class Intake {
         transfer.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
     }
 
-    public void setState(IntakeState state){
-        currentState = state;
-    }
-
-    public IntakeState getState(){
-        return currentState;
-    }
-
     public void toggle(){
         if(currentState == IntakeState.ON || currentState == IntakeState.SPIT){
             currentState = IntakeState.OFF;
@@ -38,11 +31,21 @@ public class Intake {
         }
     }
 
+    @Override
     public void update(){
         if(currentState != lastState){
             intake.setPower(currentState.val);
             transfer.setPower(currentState.val);
+
             lastState = currentState;
         }
+    }
+
+    public void setState(IntakeState state){
+        currentState = state;
+    }
+
+    public IntakeState getState(){
+        return currentState;
     }
 }

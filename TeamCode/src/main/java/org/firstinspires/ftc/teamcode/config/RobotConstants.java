@@ -4,6 +4,12 @@ import com.acmerobotics.dashboard.config.Config;
 
 @Config
 public class RobotConstants {
+
+    public enum RobotState{
+        IDLE,
+        COLLECTING,
+        SHOOTING;
+    }
     public enum IntakeState{
         ON(1), OFF(0), SPIT(-1);
         public final double val;
@@ -11,5 +17,12 @@ public class RobotConstants {
             this.val=val;
         }
 
+    }
+
+    public enum ShootingState {
+        OFF(),
+        SPINNING_UP,
+        READY,
+        SHOOTING
     }
 }
