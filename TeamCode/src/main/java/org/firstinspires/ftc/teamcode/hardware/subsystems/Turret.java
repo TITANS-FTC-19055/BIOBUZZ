@@ -8,7 +8,6 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.arcrobotics.ftclib.controller.PIDController;
 import com.arcrobotics.ftclib.controller.wpilibcontroller.SimpleMotorFeedforward;
-import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
@@ -37,12 +36,12 @@ public class Turret implements Updateable {
         private final SimpleMotorFeedforward feedforward;
 
         public Turret(@NonNull HardwareMap hwmap) {
-            rotation_encoder = hwmap.get(DcMotorEx.class, HardwareConfig.rotation_encoder);
             launch1 = hwmap.get(DcMotorEx.class, HardwareConfig.launch1);
             launch2 = hwmap.get(DcMotorEx.class, HardwareConfig.launch2);
 
             hrot1 = hwmap.get(CRServo.class, HardwareConfig.hrot1);
             hrot2 = hwmap.get(CRServo.class, HardwareConfig.hrot2);
+            rotation_encoder = hwmap.get(DcMotorEx.class, HardwareConfig.rotation_encoder);
 
             this.voltageSensor = hwmap.getAll(VoltageSensor.class).get(0);
 
@@ -134,7 +133,5 @@ public class Turret implements Updateable {
         public void setHorizontalAngle(double angleInDegrees){
             rotation_target = (8192*angleInDegrees)/360;
         }
-
-
 
     }
