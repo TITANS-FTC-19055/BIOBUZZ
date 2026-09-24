@@ -5,8 +5,8 @@ import androidx.annotation.NonNull;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
+import org.firstinspires.ftc.teamcode.config.Constants.IntakeState;
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
-import org.firstinspires.ftc.teamcode.config.RobotConstants.IntakeState;
 import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
 public class Intake implements Updateable {
@@ -22,13 +22,12 @@ public class Intake implements Updateable {
         transfer.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
     }
 
-    public void toggle(){
-        if(currentState == IntakeState.ON || currentState == IntakeState.SPIT){
-            currentState = IntakeState.OFF;
-        }
-        else{
-            currentState = IntakeState.ON;
-        }
+    public void collect(){
+        currentState = IntakeState.ON;
+    }
+
+    public void stop(){
+        currentState = IntakeState.OFF;
     }
 
     @Override

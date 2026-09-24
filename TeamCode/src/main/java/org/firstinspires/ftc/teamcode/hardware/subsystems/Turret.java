@@ -2,7 +2,6 @@ package org.firstinspires.ftc.teamcode.hardware.subsystems;
 
 import androidx.annotation.NonNull;
 
-import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -10,8 +9,8 @@ import com.arcrobotics.ftclib.controller.PIDController;
 import com.arcrobotics.ftclib.controller.wpilibcontroller.SimpleMotorFeedforward;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
+import org.firstinspires.ftc.teamcode.config.Constants.ShootingState;
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
-import org.firstinspires.ftc.teamcode.config.RobotConstants.ShootingState;
 import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
 public class Turret implements Updateable {
@@ -26,15 +25,10 @@ public class Turret implements Updateable {
         public double voltage = 12.0;
         public final double nominalVoltage = 12.0;
 
-        public double ticksPerRotation = 8192;
-        public double rotation_target = 0;
-
         private ShootingState state;
 
         private final PIDController controller;
         private final SimpleMotorFeedforward feedforward;
-
-        private final TurretHRot hrot;
 
         public Turret(@NonNull HardwareMap hwmap) {
             motor1 = hwmap.get(DcMotorEx.class, HardwareConfig.launch1);
@@ -55,8 +49,6 @@ public class Turret implements Updateable {
 
             controller = new PIDController(kp, 0, 0);
             feedforward = new SimpleMotorFeedforward(ks, kv, ka);
-
-            hrot = new TurretHRot(hwmap);
 
             state = ShootingState.OFF;
         }
@@ -83,13 +75,11 @@ public class Turret implements Updateable {
                     break;
                 case SHOOTING:
                     setMotorPower(calculateMotorPower());
-                    if(!isAtTargetVelocity(120.0)){
-                        state = ShootingState.SPINNING_UP;
-                    }
+//                    if(!isAtTargetVelocity(120.0)){
+//                        state = ShootingState.SPINNING_UP;
+//                    }
                     break;
             }
-
-            hrot.update();
 
         }
 
@@ -129,10 +119,6 @@ public class Turret implements Updateable {
 
         public boolean isAtTargetVelocity(double error){
             return Math.abs(currentVelocity - targetVelocity) <= error;
-        }
-
-        public void setHRotAngle(double angle){
-            hrot.setTargetAngle(angle);
         }
 
 }
