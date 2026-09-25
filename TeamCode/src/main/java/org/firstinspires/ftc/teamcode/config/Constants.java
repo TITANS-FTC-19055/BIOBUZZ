@@ -22,21 +22,4 @@ public class Constants {
         RED, BLUE;
     }
 
-    public enum RobotState{
-        IDLE, COLLECTING, SHOOTING;
-    }
-
-    public enum ShootingState {
-        OFF, SPINNING_UP, READY, SHOOTING;
-    }
-
-    public enum IntakeState{
-        ON(1), OFF(0), SPIT(-1);
-        public final double val;
-        IntakeState(double val){
-            this.val=val;
-        }
-
-    }
-
 }

@@ -1,7 +1,11 @@
 package org.firstinspires.ftc.teamcode.hardware.subsystems;
 
+import static com.pedropathing.ivy.commands.Commands.infinite;
+import static com.pedropathing.ivy.commands.Commands.instant;
+
 import androidx.annotation.NonNull;
 
+import com.pedropathing.ivy.Command;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -9,23 +13,18 @@ import com.arcrobotics.ftclib.controller.PIDController;
 import com.arcrobotics.ftclib.controller.wpilibcontroller.SimpleMotorFeedforward;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
-import org.firstinspires.ftc.teamcode.config.Constants.ShootingState;
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
-import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
-public class Turret implements Updateable {
+public class Turret {
 
         private final DcMotorEx motor1, motor2;
         private final VoltageSensor voltageSensor;
 
         public static double ks = 0, kv = 0.00055, ka = 100, kp = 0.008;
-
-        private double targetVelocity = 0;
-        private double currentVelocity = 0;
+        private double targetVelocity = 0, currentVelocity = 0;
         public double voltage = 12.0;
         public final double nominalVoltage = 12.0;
-
-        private ShootingState state;
+        private volatile double boostPower = 0.0;
 
         private final PIDController controller;
         private final SimpleMotorFeedforward feedforward;
@@ -49,49 +48,18 @@ public class Turret implements Updateable {
 
             controller = new PIDController(kp, 0, 0);
             feedforward = new SimpleMotorFeedforward(ks, kv, ka);
-
-            state = ShootingState.OFF;
         }
 
-        @Override
-        public void update() {
+        private void refresh(){
             voltage = voltageSensor.getVoltage();
             currentVelocity = motor1.getVelocity();
-
-//            controller.setPID(kp, 0, 0);
-
-            switch (state){
-                case OFF:
-                    stopMotors();
-                    break;
-                case SPINNING_UP:
-                    setMotorPower(calculateMotorPower());
-                    if(isAtTargetVelocity(50.0)) {
-                        state = ShootingState.READY;
-                    }
-                    break;
-                case READY:
-                    setMotorPower(calculateMotorPower());
-                    break;
-                case SHOOTING:
-                    setMotorPower(calculateMotorPower());
-//                    if(!isAtTargetVelocity(120.0)){
-//                        state = ShootingState.SPINNING_UP;
-//                    }
-                    break;
-            }
-
         }
 
         private double calculateMotorPower(){
             double pidOutput = controller.calculate(currentVelocity, targetVelocity);
             double ffOutput = feedforward.calculate(targetVelocity);
 
-//            if(state == ShootingState.SHOOTING && (targetVelocity - currentVelocity) > 100){
-//                pidOutput += 0.15;
-//            }
-
-            return Math.min(1.0, (pidOutput + ffOutput) * (nominalVoltage / voltage));
+            return Math.min(1.0, (pidOutput + ffOutput + boostPower) * (nominalVoltage / voltage));
         }
 
         private void setMotorPower(double power){
@@ -99,22 +67,29 @@ public class Turret implements Updateable {
             motor2.setPower(power);
         }
 
-        private void stopMotors(){
-            motor1.setPower(0);
-            motor2.setPower(0);
-            controller.reset();
+        public Command spinTo(double targetVelocity){
+            return infinite(() -> {
+                refresh();
+                setMotorPower(calculateMotorPower());
+            })
+                    .setStart(() -> this.targetVelocity = targetVelocity)
+                    .requiring(this);
         }
 
-        public void setState(ShootingState state){
-            this.state = state;
+        public Command waitUntilReady(){
+            return Command.build().setDone(() -> isAtTargetVelocity(50.0));
         }
 
-        public void setTargetVelocity(double targetVelocity){
-            this.targetVelocity = targetVelocity;
+        public Command boost(double boost){
+            return instant(() -> boostPower = boost);
         }
 
-        public double getCurrentVelocity(){
-            return currentVelocity;
+        public Command stop(){
+            return instant(() -> {
+                motor1.setPower(0);
+                motor2.setPower(0);
+                controller.reset();
+            }).requiring(this);
         }
 
         public boolean isAtTargetVelocity(double error){

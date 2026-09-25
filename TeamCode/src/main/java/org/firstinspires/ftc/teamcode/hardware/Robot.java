@@ -1,10 +1,15 @@
 package org.firstinspires.ftc.teamcode.hardware;
 
+import static com.pedropathing.ivy.commands.Commands.instant;
+import static com.pedropathing.ivy.groups.Groups.sequential;
+
 import androidx.annotation.NonNull;
 
 import com.pedropathing.drivetrain.DrivePowers;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.ManualDrive;
+import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -24,7 +29,6 @@ public class Robot implements Updateable {
     private final Turret turret;
     private final TurretHRot hrot;
 
-    public RobotState state = RobotState.IDLE;
     public Alliance alliance = Alliance.RED;
 
     public Robot(@NonNull HardwareMap hardwareMap, Telemetry telemetry){
@@ -54,10 +58,6 @@ public class Robot implements Updateable {
         ManualDrive.driveOrHold(follower, powers);
     }
 
-    public void alignTurret(){
-        hrot.setTargetAngleFieldCentric(getClosestCell().pose, follower.pose());
-    }
-
     public Cell getClosestCell(){
         Pose currentPose = follower.pose();
 
@@ -85,36 +85,22 @@ public class Robot implements Updateable {
 
     }
 
-    private void handleIdleState(){
-
-    }
-
-    private void handleCollectingState(){
-
-    }
-
-    private void handleShootingState(){
-
+    public Command shootSequence(double targetRpm){
+        return instant(() -> Scheduler.schedule(
+                turret.spinTo(targetRpm),
+                sequential(
+                        turret.waitUntilReady(),
+                        turret.boost(0.15),
+                        intake.collect(),
+                        turret.boost(0.0)
+                )
+        ));
     }
 
     @Override
     public void update() {
-        switch (state){
-            case IDLE:
-                handleIdleState();
-                break;
-            case COLLECTING:
-                handleCollectingState();
-                break;
-            case SHOOTING:
-                handleShootingState();
-                break;
-        }
 
         follower.update();
-        intake.update();
-        turret.update();
-
         telemetryData();
     }
 
@@ -135,24 +121,5 @@ public class Robot implements Updateable {
         return alliance;
     }
 
-    public void setState(RobotState state){
-        if(this.state == state) return;
-
-        switch (state){
-            case IDLE:
-                intake.stop();
-                break;
-            case COLLECTING:
-                intake.collect();
-                break;
-            case SHOOTING:
-                break;
-        }
-
-        this.state = state;
-    }
-    public RobotState getState() {
-        return state;
-    }
 
 }

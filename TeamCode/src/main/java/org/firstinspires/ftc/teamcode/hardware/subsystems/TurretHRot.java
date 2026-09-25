@@ -1,20 +1,22 @@
 package org.firstinspires.ftc.teamcode.hardware.subsystems;
 
-import static org.firstinspires.ftc.teamcode.config.Constants.*;
+import static com.pedropathing.ivy.commands.Commands.infinite;
+import static com.pedropathing.ivy.commands.Commands.instant;
 
 import androidx.annotation.NonNull;
 
 import com.arcrobotics.ftclib.controller.PIDController;
+import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
+import org.firstinspires.ftc.robotcore.external.Supplier;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
-import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
-public class TurretHRot implements Updateable {
+public class TurretHRot {
     private final CRServo servo1, servo2;
     private final DcMotorEx encoder;
 
@@ -44,36 +46,29 @@ public class TurretHRot implements Updateable {
         controller = new PIDController(kP, kI, kD);
     }
 
-    @Override
-    public void update() {
+    private void rotateToAngle(double angle){
         currentAngle = encoder.getCurrentPosition() / TICKS_PER_DEGREE;
 
-        double rotationPower = controller.calculate(currentAngle, targetAngle);
-
-        rotationPower = Math.max(-1.0, Math.min(1.0, rotationPower));
-
-        if(isAtTargetAngle(1.0)){
-            rotationPower = 0.0;
-        }
-
-        setServoPower(rotationPower);
-    }
-
-    public void setTargetAngleRobotCentric(double angle){
         double normalized = AngleUnit.normalizeDegrees(angle);
-        this.targetAngle = Math.max(MIN_ANGLE, Math.min(MAX_ANGLE, normalized));
+        targetAngle = Math.max(MIN_ANGLE, Math.min(MAX_ANGLE, normalized));
+
+        double power = Math.max(-1.0, Math.min(1.0, controller.calculate(currentAngle, targetAngle)));
+        setServoPower(isAtTargetAngle(1.0) ? 0.0 : power);
     }
 
-    public void setTargetAngleFieldCentric(Pose target, Pose robot){
-        double dx = target.x() - robot.x();
-        double dy = target.y() - robot.y();
-        double fieldTarget = Math.atan2(dy, dx);
-        double robotRelativeAngle = fieldTarget - robot.heading();
-        setTargetAngleRobotCentric(Math.toDegrees(robotRelativeAngle));
+    public Command trackFieldPose(Supplier<Pose> target, Supplier<Pose> robot){
+        return infinite(() -> {
+            Pose t = target.get(), r = robot.get();
+            double fieldTarget = Math.atan2(t.y() - r.y(), t.x() - r.x());
+            rotateToAngle(Math.toDegrees(fieldTarget - r.heading()));
+        }).requiring(this);
     }
 
-    public double getTargetAngle(){
-        return targetAngle;
+    public Command stop(){
+        return instant(() -> {
+            setServoPower(0);
+            controller.reset();
+        }).requiring(this);
     }
 
     public double getCurrentAngle(){
@@ -87,10 +82,5 @@ public class TurretHRot implements Updateable {
     private void setServoPower(double power){
         servo1.setPower(power);
         servo2.setPower(power);
-    }
-
-    public void stop(){
-        setServoPower(0.0);
-        controller.reset();
     }
 }

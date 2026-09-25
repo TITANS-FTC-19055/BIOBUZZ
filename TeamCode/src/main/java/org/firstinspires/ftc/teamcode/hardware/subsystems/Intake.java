@@ -1,18 +1,18 @@
 package org.firstinspires.ftc.teamcode.hardware.subsystems;
 
+import static com.pedropathing.ivy.commands.Commands.instant;
+
 import androidx.annotation.NonNull;
 
+import com.pedropathing.ivy.Command;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
-import org.firstinspires.ftc.teamcode.config.Constants.IntakeState;
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
-import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
-public class Intake implements Updateable {
+public class Intake {
     private final DcMotor intake, transfer;
-    private IntakeState currentState = IntakeState.OFF;
-    private IntakeState lastState = null;
+
 
     public Intake(@NonNull HardwareMap hwmap){
         intake = hwmap.get(DcMotor.class, HardwareConfig.intake);
@@ -22,29 +22,18 @@ public class Intake implements Updateable {
         transfer.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
     }
 
-    public void collect(){
-        currentState = IntakeState.ON;
+    public Command collect(){
+        return instant(() -> {
+            intake.setPower(1);
+            transfer.setPower(1);
+        }).requiring(this);
     }
 
-    public void stop(){
-        currentState = IntakeState.OFF;
+    public Command stop(){
+        return instant(() -> {
+            intake.setPower(0);
+            transfer.setPower(0);
+        }).requiring(this);
     }
 
-    @Override
-    public void update(){
-        if(currentState != lastState){
-            intake.setPower(currentState.val);
-            transfer.setPower(currentState.val);
-
-            lastState = currentState;
-        }
-    }
-
-    public void setState(IntakeState state){
-        currentState = state;
-    }
-
-    public IntakeState getState(){
-        return currentState;
-    }
 }
