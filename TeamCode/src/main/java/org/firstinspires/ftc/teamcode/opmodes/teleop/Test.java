@@ -1,9 +1,9 @@
 package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
+import com.pedropathing.ivy.Scheduler;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.teamcode.config.Constants.RobotState;
 import org.firstinspires.ftc.teamcode.hardware.Robot;
 import org.firstinspires.ftc.teamcode.lib.control.Controller;
 
@@ -15,20 +15,21 @@ public class Test extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
         Robot robot = new Robot(hardwareMap, telemetry);
 
-        Controller controller1 = new Controller(gamepad1);
-        Controller controller2 = new Controller(gamepad2);
+        Controller controller = new Controller(gamepad1);
 
         waitForStart();
 
         while(opModeIsActive() && !isStopRequested()){
-            controller1.update();
-            controller2.update();
+            controller.update();
 
-            robot.drive(-controller1.leftStickX, controller1.leftStickY, controller1.rightStickX);
-            if(controller1.circle.isPressed()) robot.setState(RobotState.COLLECTING);
-            if(controller1.square.isPressed()) robot.setState(RobotState.SHOOTING);
+            robot.drive(-controller.leftStickX, controller.leftStickY, controller.rightStickX);
+
+            if(controller.circle.isPressed()) robot.intake.toggle().schedule();
+            if(controller.square.isPressed()) robot.shootSequence().schedule();
+
 
             robot.update();
+            Scheduler.execute();
             telemetry.update();
         }
     }

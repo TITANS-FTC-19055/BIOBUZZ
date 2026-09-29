@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.hardware;
 
 import static com.pedropathing.ivy.commands.Commands.instant;
+import static com.pedropathing.ivy.groups.Groups.parallel;
 import static com.pedropathing.ivy.groups.Groups.sequential;
 
 import androidx.annotation.NonNull;
@@ -9,7 +10,6 @@ import com.pedropathing.drivetrain.DrivePowers;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.ManualDrive;
 import com.pedropathing.ivy.Command;
-import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -17,19 +17,21 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.config.Constants.*;
 import org.firstinspires.ftc.teamcode.hardware.pedro.Constants;
 import org.firstinspires.ftc.teamcode.hardware.subsystems.Intake;
+import org.firstinspires.ftc.teamcode.hardware.subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.hardware.subsystems.Turret;
-import org.firstinspires.ftc.teamcode.hardware.subsystems.TurretHRot;
 import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
 public class Robot implements Updateable {
     private final Telemetry telemetry;
     private final Follower follower;
 
-    private final Intake intake;
-    private final Turret turret;
-    private final TurretHRot hrot;
+    public final Intake intake;
+    public final Shooter shooter;
+    public final Turret turret;
 
     public Alliance alliance = Alliance.RED;
+    public Pose closestCell = null;
+    public double targetRpm = 0;
 
     public Robot(@NonNull HardwareMap hardwareMap, Telemetry telemetry){
         this(hardwareMap, telemetry, OpModeStorage.autoEndPose);
@@ -44,11 +46,12 @@ public class Robot implements Updateable {
         }
 
         intake = new Intake(hardwareMap);
+        shooter = new Shooter(hardwareMap);
         turret = new Turret(hardwareMap);
-        hrot = new TurretHRot(hardwareMap);
     }
 
     public void drive(double forward, double strafe, double rotate){
+        if(follower == null) return;
         DrivePowers powers = ManualDrive.fieldCentric(
                 forward,
                 strafe,
@@ -58,7 +61,21 @@ public class Robot implements Updateable {
         ManualDrive.driveOrHold(follower, powers);
     }
 
-    public Cell getClosestCell(){
+
+    public Command shootSequence(){
+        return parallel(
+                shooter.spin(this::calculateTargetRpm),
+                turret.trackFieldPose(() -> getClosestCell().pose, follower::pose),
+                sequential(
+                        shooter.waitUntilReady(),
+                        turret.waitUntilReady(),
+                        intake.activate()
+                )
+
+        );
+    }
+
+    private Cell getClosestCell(){
         Pose currentPose = follower.pose();
 
         Cell audienceCell = (alliance == Alliance.RED)
@@ -75,43 +92,42 @@ public class Robot implements Updateable {
         return (distToAudience < distToScoring) ? audienceCell : scoringCell;
     }
 
-    public Alliance determineAllianceFromPose(@NonNull Pose startingPose){
-        if(startingPose.x() >= 0 && startingPose.x() <= 72){
-            return Alliance.RED;
-        }
-        else{
-            return Alliance.BLUE;
-        }
+    private double calculateTargetRpm(){
+        Pose target = getClosestCell().pose;
+        double distance = follower.pose().distance(target);
 
+        return getRpmForDistance(distance);
     }
 
-    public Command shootSequence(double targetRpm){
-        return instant(() -> Scheduler.schedule(
-                turret.spinTo(targetRpm),
-                sequential(
-                        turret.waitUntilReady(),
-                        turret.boost(0.15),
-                        intake.collect(),
-                        turret.boost(0.0)
-                )
-        ));
+    private double getRpmForDistance(double distance){
+        // Placeholder
+        return 1500;
+    }
+
+    private Alliance determineAllianceFromPose(@NonNull Pose startingPose){
+        return (startingPose.x() >= 0 && startingPose.x() <= 72)
+                ? Alliance.RED
+                : Alliance.BLUE;
     }
 
     @Override
     public void update() {
-
-        follower.update();
+        if(follower != null) {
+            follower.update();
+        }
         telemetryData();
     }
 
     public void telemetryData(){
+        if(telemetry == null) return;
         telemetry.addData("X:", follower.pose().x());
         telemetry.addData("Y:", follower.pose().y());
         telemetry.addData("Heading:", follower.pose().heading());
         telemetry.addLine("--------------------------------------------------");
-        telemetry.addData("Turret Angle:", hrot.getCurrentAngle());
+        telemetry.addData("Turret Angle:", turret.getCurrentAngle());
         telemetry.addLine("--------------------------------------------------");
         telemetry.addData("Alliance:", getAlliance());
+        telemetry.addData("Closest Cell:", getClosestCell());
     }
 
     public void setAlliance(Alliance alliance){

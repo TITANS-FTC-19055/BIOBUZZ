@@ -5,95 +5,129 @@ import static com.pedropathing.ivy.commands.Commands.instant;
 
 import androidx.annotation.NonNull;
 
-import com.pedropathing.ivy.Command;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.arcrobotics.ftclib.controller.PIDController;
-import com.arcrobotics.ftclib.controller.wpilibcontroller.SimpleMotorFeedforward;
-import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.pedropathing.ivy.Command;
+import com.pedropathing.math.Pose;
+import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.util.Range;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
 
+import java.util.function.Supplier;
+
 public class Turret {
+    private final CRServo servo1, servo2;
+    private final DcMotorEx encoder;
 
-        private final DcMotorEx motor1, motor2;
-        private final VoltageSensor voltageSensor;
+    public static double kP = 0.03, kI = 0.0, kD = 0.001;
+    //Placeholder
+    public static  double GEAR_RATIO = 100.0/20.0;
+    public static double TICKS_PER_DEGREE = 8192.0/360.0 * GEAR_RATIO;
 
-        public static double ks = 0, kv = 0.00055, ka = 100, kp = 0.008;
-        private double targetVelocity = 0, currentVelocity = 0;
-        public double voltage = 12.0;
-        public final double nominalVoltage = 12.0;
-        private volatile double boostPower = 0.0;
+    // Placeholder
+    public static double MIN_ANGLE = -180;
+    public static double MAX_ANGLE = 180;
 
-        private final PIDController controller;
-        private final SimpleMotorFeedforward feedforward;
+    private double targetAngle = 0;
+    private double currentAngle = 0;
 
-        public Turret(@NonNull HardwareMap hwmap) {
-            motor1 = hwmap.get(DcMotorEx.class, HardwareConfig.launch1);
-            motor2 = hwmap.get(DcMotorEx.class, HardwareConfig.launch2);
+    private double lastKp = kP, lastKi = kI, lastKd = kD;
 
-            this.voltageSensor = hwmap.getAll(VoltageSensor.class).get(0);
+    private final PIDController controller;
 
-            motor1.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
-            motor1.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
+    public Turret(@NonNull HardwareMap hwmap){
+        servo1 = hwmap.get(CRServo.class, HardwareConfig.hrot1);
+        servo2 = hwmap.get(CRServo.class, HardwareConfig.hrot2);
 
-            motor2.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
-            motor2.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
+        servo2.setDirection(CRServo.Direction.REVERSE);
 
-            motor1.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
-            motor2.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.FLOAT);
+        encoder = hwmap.get(DcMotorEx.class, HardwareConfig.rotation_encoder);
+        encoder.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
+        encoder.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
 
-            motor2.setDirection(DcMotorSimple.Direction.REVERSE);
+        controller = new PIDController(kP, kI, kD);
+    }
 
-            controller = new PIDController(kp, 0, 0);
-            feedforward = new SimpleMotorFeedforward(ks, kv, ka);
+    private void updateCurrentAngle(){
+        currentAngle = encoder.getCurrentPosition() / TICKS_PER_DEGREE;
+    }
+
+    private void checkTuningParameters() {
+        if (kP != lastKp || kI != lastKi || kD != lastKd) {
+            controller.setPID(kP, kI, kD);
+            lastKp = kP;
+            lastKi = kI;
+            lastKd = kD;
         }
+    }
 
-        private void refresh(){
-            voltage = voltageSensor.getVoltage();
-            currentVelocity = motor1.getVelocity();
-        }
+    private void rotateToAngle(double angle){
+        updateCurrentAngle();
+        checkTuningParameters();
 
-        private double calculateMotorPower(){
-            double pidOutput = controller.calculate(currentVelocity, targetVelocity);
-            double ffOutput = feedforward.calculate(targetVelocity);
+        double deltaAngle = AngleUnit.normalizeDegrees(angle - currentAngle);
+        double targetUnwrapped = currentAngle + deltaAngle;
 
-            return Math.min(1.0, (pidOutput + ffOutput + boostPower) * (nominalVoltage / voltage));
-        }
+        targetAngle = Range.clip(targetUnwrapped, MIN_ANGLE, MAX_ANGLE);
 
-        private void setMotorPower(double power){
-            motor1.setPower(power);
-            motor2.setPower(power);
-        }
+        double power = controller.calculate(currentAngle, targetAngle);
+        setServoPower(Range.clip(power, -1.0, 1.0));
+    }
 
-        public Command spinTo(double targetVelocity){
-            return infinite(() -> {
-                refresh();
-                setMotorPower(calculateMotorPower());
-            })
-                    .setStart(() -> this.targetVelocity = targetVelocity)
-                    .requiring(this);
-        }
+    public Command goToAngle(Supplier<Double> angleSupplier) {
+        return infinite(() -> rotateToAngle(angleSupplier.get())).requiring(this);
+    }
 
-        public Command waitUntilReady(){
-            return Command.build().setDone(() -> isAtTargetVelocity(50.0));
-        }
+    public Command goToAngle(double targetAngle) {
+        return goToAngle(() -> targetAngle);
+    }
 
-        public Command boost(double boost){
-            return instant(() -> boostPower = boost);
-        }
+    public Command trackFieldPose(Supplier<Pose> target, Supplier<Pose> robot){
+        return infinite(() -> {
+            Pose t = target.get(), r = robot.get();
 
-        public Command stop(){
-            return instant(() -> {
-                motor1.setPower(0);
-                motor2.setPower(0);
-                controller.reset();
-            }).requiring(this);
-        }
+            double fieldTarget = Math.atan2(t.y() - r.y(), t.x() - r.x());
+            double relativeTarget = fieldTarget - r.heading();
 
-        public boolean isAtTargetVelocity(double error){
-            return Math.abs(currentVelocity - targetVelocity) <= error;
-        }
+            rotateToAngle(Math.toDegrees(relativeTarget));
+        }).requiring(this);
+    }
 
+    public Command waitUntilReady(double toleranceDegrees) {
+        return Command.build().setDone(() -> isAtTargetAngle(toleranceDegrees));
+    }
+
+    public Command waitUntilReady() {
+        return waitUntilReady(2.0);
+    }
+
+    public Command stop(){
+        return instant(() -> {
+            setServoPower(0);
+            controller.reset();
+        }).requiring(this);
+    }
+
+    public double getCurrentAngle(){
+        return currentAngle;
+    }
+
+    public double getTargetAngle(){
+        return targetAngle;
+    }
+    public double getAngleError() {
+        return Math.abs(currentAngle - targetAngle);
+    }
+
+    public boolean isAtTargetAngle(double errorTolerance) {
+        return getAngleError() <= errorTolerance;
+    }
+
+    private void setServoPower(double power){
+        servo1.setPower(power);
+        servo2.setPower(power);
+    }
 }
