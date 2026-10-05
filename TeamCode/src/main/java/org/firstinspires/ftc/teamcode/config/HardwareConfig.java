@@ -7,6 +7,8 @@ public class HardwareConfig {
     public static final String LB = "LB";
     public static final String intake = "intake";
     public static final String transfer = "transfer";
+    public static final String intake_sensor = "intake_sensor";
+    public static final String exit_sensor = "exit_sensor";
     public static final String hrot1 = "hrot1";
     public static final String hrot2 = "hrot2";
     public static final String launch1 = "launch1";

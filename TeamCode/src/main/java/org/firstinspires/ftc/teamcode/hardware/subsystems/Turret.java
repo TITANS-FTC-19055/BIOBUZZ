@@ -24,7 +24,7 @@ public class Turret {
 
     public static double kP = 0.03, kI = 0.0, kD = 0.001;
     //Placeholder
-    public static  double GEAR_RATIO = 100.0/20.0;
+    public static  double GEAR_RATIO = 80.0/30.0;
     public static double TICKS_PER_DEGREE = 8192.0/360.0 * GEAR_RATIO;
 
     // Placeholder
@@ -41,8 +41,6 @@ public class Turret {
     public Turret(@NonNull HardwareMap hwmap){
         servo1 = hwmap.get(CRServo.class, HardwareConfig.hrot1);
         servo2 = hwmap.get(CRServo.class, HardwareConfig.hrot2);
-
-        servo2.setDirection(CRServo.Direction.REVERSE);
 
         encoder = hwmap.get(DcMotorEx.class, HardwareConfig.rotation_encoder);
         encoder.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);

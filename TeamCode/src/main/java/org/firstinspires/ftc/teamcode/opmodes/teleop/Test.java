@@ -24,7 +24,7 @@ public class Test extends LinearOpMode {
 
             robot.drive(-controller.leftStickX, controller.leftStickY, controller.rightStickX);
 
-            if(controller.circle.isPressed()) robot.intake.toggle().schedule();
+          //  if(controller.circle.isPressed()) robot.intake.toggle().schedule();
             if(controller.square.isPressed()) robot.shootSequence().schedule();
 
 

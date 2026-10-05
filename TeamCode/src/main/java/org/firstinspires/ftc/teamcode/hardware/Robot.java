@@ -69,7 +69,7 @@ public class Robot implements Updateable {
                 sequential(
                         shooter.waitUntilReady(),
                         turret.waitUntilReady(),
-                        intake.activate()
+                        intake.feedToShooter()
                 )
 
         );
