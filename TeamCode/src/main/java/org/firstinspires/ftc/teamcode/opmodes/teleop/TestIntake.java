@@ -27,12 +27,7 @@ public class TestIntake extends OpMode {
         if(controller.circle.isPressed()) intake.reverse().schedule();
         if(controller.triangle.isPressed()) intake.feedToShooter().schedule();
 
-        telemetry.addData("isRunning", intake.isRunning());
-        telemetry.addData("getElementCount", intake.getElementCount());
-        telemetry.addData("isFull", intake.isFull());
-        telemetry.addData("isEmpty", intake.isEmpty());
-        telemetry.addData("isReadyToShoot", intake.isReadyToShoot());
-        telemetry.addData("state", intake.getState());
+        intake.debug(telemetry);
 
         Scheduler.execute();
         telemetry.update();
