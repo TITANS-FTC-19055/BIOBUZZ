@@ -104,7 +104,7 @@ public class Turret {
             double fieldTarget = Math.atan2(t.y() - r.y(), t.x() - r.x());
             double relativeTarget = fieldTarget - r.heading();
 
-            rotateToAngle(Math.toDegrees(relativeTarget));
+            rotateToAngle(-Math.toDegrees(relativeTarget));
         }).requiring(this);
     }
 
@@ -143,7 +143,7 @@ public class Turret {
         t.addData("Target Angle", targetAngle);
         t.addData("Angle Error", getAngleError());
         t.addData("Is At Target Angle", isAtTargetAngle(2.0));
-        t.addLine("---------------------------------------------");
+        t.addLine("--------------------------------------------------");
         t.addData("kP (dashboard)", kP);
         t.addData("kI (dashboard)", kI);
         t.addData("kD (dashboard)", kD);

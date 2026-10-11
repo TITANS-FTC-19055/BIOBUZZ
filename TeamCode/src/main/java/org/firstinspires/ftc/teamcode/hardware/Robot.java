@@ -4,6 +4,8 @@ import static com.pedropathing.ivy.commands.Commands.instant;
 import static com.pedropathing.ivy.groups.Groups.parallel;
 import static com.pedropathing.ivy.groups.Groups.sequential;
 
+import static org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.telemetry;
+
 import androidx.annotation.NonNull;
 
 import com.pedropathing.drivetrain.DrivePowers;
@@ -22,7 +24,6 @@ import org.firstinspires.ftc.teamcode.hardware.subsystems.Turret;
 import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
 public class Robot implements Updateable {
-    private final Telemetry telemetry;
     private final Follower follower;
 
     public final Intake intake;
@@ -33,12 +34,11 @@ public class Robot implements Updateable {
     public Pose closestCell = null;
     public double targetRpm = 0;
 
-    public Robot(@NonNull HardwareMap hardwareMap, Telemetry telemetry){
-        this(hardwareMap, telemetry, OpModeStorage.autoEndPose);
+    public Robot(@NonNull HardwareMap hardwareMap){
+        this(hardwareMap, OpModeStorage.autoEndPose);
     }
 
-    public Robot(@NonNull HardwareMap hardwareMap, Telemetry telemetry, Pose startingPose) {
-        this.telemetry = telemetry;
+    public Robot(@NonNull HardwareMap hardwareMap, Pose startingPose) {
         follower = Constants.create(hardwareMap);
         if(startingPose != null && follower != null){
             follower.setPose(startingPose);
@@ -115,19 +115,17 @@ public class Robot implements Updateable {
         if(follower != null) {
             follower.update();
         }
-        telemetryData();
     }
 
-    public void telemetryData(){
-        if(telemetry == null) return;
-        telemetry.addData("X:", follower.pose().x());
-        telemetry.addData("Y:", follower.pose().y());
-        telemetry.addData("Heading:", follower.pose().heading());
-        telemetry.addLine("--------------------------------------------------");
-        telemetry.addData("Turret Angle:", turret.getCurrentAngle());
-        telemetry.addLine("--------------------------------------------------");
-        telemetry.addData("Alliance:", getAlliance());
-        telemetry.addData("Closest Cell:", getClosestCell());
+    public void debug(Telemetry t){
+        t.addData("X:", follower.pose().x());
+        t.addData("Y:", follower.pose().y());
+        t.addData("Heading:", follower.pose().heading());
+        t.addLine("--------------------------------------------------");
+        t.addData("Turret Angle:", turret.getCurrentAngle());
+        t.addLine("--------------------------------------------------");
+        t.addData("Alliance:", getAlliance());
+        t.addData("Closest Cell:", getClosestCell());
     }
 
     public void setAlliance(Alliance alliance){

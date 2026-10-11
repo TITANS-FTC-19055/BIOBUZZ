@@ -13,7 +13,7 @@ public class Test extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
-        Robot robot = new Robot(hardwareMap, telemetry);
+        Robot robot = new Robot(hardwareMap);
 
         Controller controller = new Controller(gamepad1);
 
@@ -24,12 +24,15 @@ public class Test extends LinearOpMode {
 
             robot.drive(-controller.leftStickX, controller.leftStickY, controller.rightStickX);
 
-          //  if(controller.circle.isPressed()) robot.intake.toggle().schedule();
+            // if(controller.circle.isPressed()) robot.intake.toggle().schedule();
             if(controller.square.isPressed()) robot.shootSequence().schedule();
 
 
             robot.update();
+            robot.debug(telemetry);
+
             Scheduler.execute();
+
             telemetry.update();
         }
     }
