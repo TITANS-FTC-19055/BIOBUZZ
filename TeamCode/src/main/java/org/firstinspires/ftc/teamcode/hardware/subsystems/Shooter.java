@@ -60,6 +60,11 @@ public class Shooter {
         feedforward = new SimpleMotorFeedforward(ks, kv, ka);
     }
 
+    public void setPower(double power){
+        motor1.setPower(power);
+        motor2.setPower(power);
+    }
+
     private void refresh() {
         if (voltageSensor != null) {
             double v = voltageSensor.getVoltage();

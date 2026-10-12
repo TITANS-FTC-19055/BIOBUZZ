@@ -41,7 +41,7 @@ public class Intake {
     private static final long REVERSE_RESET_DURATION_NS = 200_000_000L;
     private static final long INTAKE_CONFIRMATION_DURATION_NS = 800_000_000L;
     private static final long FEED_CONFIRMATION_DURATION_NS = 400_000_000L;
-    private static final long BLOCKER_FEED_DURATION_NS = 1_000_000_000L;
+    private static final long BLOCKER_FEED_DURATION_NS = 500_000_000L;
 
     private static long intakeStartTime = 0;
     private boolean startedConfirmingFull = false;
@@ -49,7 +49,6 @@ public class Intake {
     private long reverseStartTime = 0;
     private boolean startedConfirmingEmpty = false;
     private long blockerStartTime = 0;
-    private boolean blocked = false;
 
     private final DcMotor intake, transfer;
     private final DistanceSensor intakeSensor, exitSensor;
@@ -121,20 +120,19 @@ public class Intake {
 
         if(currentState != state && state == State.INTAKING){
             blocker.setPosition(1);
-            blocked = true;
             startedConfirmingFull = false;
         }
 
         if(currentState != state && state == State.SHOOTING){
             blockerStartTime = System.nanoTime();
+            blocker.setPosition(0.745);
             startedConfirmingEmpty = false;
         }
 
         currentState = state;
 
-        if((System.nanoTime() - blockerStartTime >= BLOCKER_FEED_DURATION_NS) && blocked && state == State.SHOOTING){
-          blocker.setPosition(0.7762);
-          blocked = false;
+        if((System.nanoTime() - blockerStartTime < BLOCKER_FEED_DURATION_NS) && state == State.SHOOTING){
+          return;
         }
 
         update();

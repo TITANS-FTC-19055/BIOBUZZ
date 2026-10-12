@@ -19,8 +19,6 @@ public class Drivetrain {
     private final DcMotorEx RF, RB, LF, LB;
     private IMU imu;
 
-    private ElapsedTime timer = new ElapsedTime();
-
     public Drivetrain(@NonNull HardwareMap hwmap, boolean fieldCentric) {
         RF = hwmap.get(DcMotorEx.class, HardwareConfig.RF);
         LF = hwmap.get(DcMotorEx.class, HardwareConfig.LF);

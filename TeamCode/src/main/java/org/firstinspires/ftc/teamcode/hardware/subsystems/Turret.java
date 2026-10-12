@@ -49,7 +49,7 @@ public class Turret {
         servo1.setDirection(DcMotorSimple.Direction.REVERSE);
         servo2.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        encoder = hwmap.get(DcMotorEx.class, HardwareConfig.rotation_encoder);
+        encoder = hwmap.get(DcMotorEx.class, HardwareConfig.RB);
         encoder.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
         encoder.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
 

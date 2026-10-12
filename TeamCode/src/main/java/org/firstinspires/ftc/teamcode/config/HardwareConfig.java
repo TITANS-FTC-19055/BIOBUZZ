@@ -15,8 +15,5 @@ public class HardwareConfig {
     public static final String launch1 = "launch1";
     public static final String launch2 = "launch2";
 
-    public static final String rotation_encoder = "rotation_encoder";
-
-
 
 }
