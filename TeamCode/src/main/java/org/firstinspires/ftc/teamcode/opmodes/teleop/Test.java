@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
 import com.pedropathing.ivy.Scheduler;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.hardware.Robot;
@@ -9,32 +10,38 @@ import org.firstinspires.ftc.teamcode.lib.control.Controller;
 
 
 @TeleOp
-public class Test extends LinearOpMode {
+public class Test extends OpMode {
+    Controller controller1;
+    Controller controller2;
+    Robot robot;
 
     @Override
-    public void runOpMode() throws InterruptedException {
-        Robot robot = new Robot(hardwareMap);
+    public void init() {
+        controller1 = new Controller(gamepad1);
+        robot = new Robot(hardwareMap);
+        Scheduler.reset();
+    }
 
-        Controller controller = new Controller(gamepad1);
+    @Override
+    public void loop() {
+        robot.drivetrain.drive(-controller1.leftStickY, controller1.leftStickX, controller1.rightStickX);
 
-        waitForStart();
+        if(controller1.square.isPressed()) robot.toggleIntake();
 
-        while(opModeIsActive() && !isStopRequested()){
-            controller.update();
+        if(controller2.square.isPressed()) robot.toggleReversing();
 
-            robot.drive(-controller.leftStickX, controller.leftStickY, controller.rightStickX);
+        if(controller1.circle.isPressed()) robot.shoot();
 
-            // if(controller.circle.isPressed()) robot.intake.toggle().schedule();
-            if(controller.square.isPressed()) robot.shootSequence().schedule();
+        Scheduler.execute();
 
+        robot.debug(telemetry);
 
-            robot.update();
-            robot.debug(telemetry);
+        telemetry.update();
+    }
 
-            Scheduler.execute();
-
-            telemetry.update();
-        }
+    @Override
+    public void stop(){
+        Scheduler.reset();
     }
 }
 

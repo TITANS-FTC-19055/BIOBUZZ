@@ -7,7 +7,7 @@ import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 // V2
 
 public class Controller implements Updateable {
-    private final Gamepad g;
+    private Gamepad g;
 
     public Button square, circle, cross, triangle, share, options;
     public Button dpadUp, dpadDown, dpadLeft, dpadRight;
@@ -37,6 +37,11 @@ public class Controller implements Updateable {
         bumperLeft = new Button(() -> g.left_bumper);
         leftTriggerButton = new Button(this::isLeftTriggerDown);
         rightTriggerButton = new Button(this::isRightTriggerDown);
+    }
+
+    public void update(Gamepad gamepad){
+        this.g = gamepad;
+        update();
     }
 
     public void update(){

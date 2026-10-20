@@ -1,12 +1,9 @@
 package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
-import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.pedropathing.ivy.Scheduler;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.sun.tools.javac.tree.DCTree;
 
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
 import org.firstinspires.ftc.teamcode.hardware.subsystems.Intake;
@@ -23,7 +20,7 @@ public class TestIntake extends OpMode {
         intake = new Intake(hardwareMap);
         motor = hardwareMap.get(DcMotor.class, HardwareConfig.launch1);
         controller = new Controller(gamepad1);
-        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+//        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
     }
     public void loop(){
         controller.update();

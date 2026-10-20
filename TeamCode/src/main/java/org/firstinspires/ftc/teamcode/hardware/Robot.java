@@ -18,10 +18,14 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.config.Constants.*;
 import org.firstinspires.ftc.teamcode.hardware.pedro.Constants;
+import org.firstinspires.ftc.teamcode.hardware.subsystems.Drivetrain;
 import org.firstinspires.ftc.teamcode.hardware.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.hardware.subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.hardware.subsystems.Turret;
 import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
+
+import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 public class Robot implements Updateable {
     private final Follower follower;
@@ -29,6 +33,7 @@ public class Robot implements Updateable {
     public final Intake intake;
     public final Shooter shooter;
     public final Turret turret;
+    public final Drivetrain drivetrain;
 
     public Alliance alliance = Alliance.RED;
     public Pose closestCell = null;
@@ -48,9 +53,10 @@ public class Robot implements Updateable {
         intake = new Intake(hardwareMap);
         shooter = new Shooter(hardwareMap);
         turret = new Turret(hardwareMap);
+        drivetrain = new Drivetrain(hardwareMap, true);
     }
 
-    public void drive(double forward, double strafe, double rotate){
+    public void drivePedro(double forward, double strafe, double rotate){
         if(follower == null) return;
         DrivePowers powers = ManualDrive.fieldCentric(
                 forward,
@@ -61,8 +67,48 @@ public class Robot implements Updateable {
         ManualDrive.driveOrHold(follower, powers);
     }
 
+    public void shoot(){
+        shootSequence().schedule();
+    }
+    public void shootWithTracking(){
+        shootSequenceWithTracking().schedule();
+    }
+
+    public void toggleIntake(){
+        intake.toggleIntaking().schedule();
+    }
+
+    public void toggleReversing(){
+        intake.toggleReversing().schedule();
+    }
+
+    public void rotateTurret(double angle){
+        turret.goToAngle(angle).schedule();
+    }
+
+    public void rotateTurret(Supplier<Double> angleSupplier){
+        turret.goToAngle(angleSupplier).schedule();
+    }
+
+    public void trackFieldPose(Supplier<Pose> target){
+        turret.trackFieldPose(target, follower::pose).schedule();
+    }
+
+    public void spinShooter(Supplier<Double> targetVelocitySupplier){
+        shooter.spin(targetVelocitySupplier).schedule();
+    }
 
     public Command shootSequence(){
+        return parallel(
+                shooter.spin(this::calculateTargetRpm),
+                sequential(
+                        shooter.waitUntilReady(),
+                        intake.feedToShooter()
+                )
+        );
+    }
+
+    public Command shootSequenceWithTracking(){
         return parallel(
                 shooter.spin(this::calculateTargetRpm),
                 turret.trackFieldPose(() -> getClosestCell().pose, follower::pose),
@@ -74,6 +120,8 @@ public class Robot implements Updateable {
 
         );
     }
+
+
 
     private Cell getClosestCell(){
         Pose currentPose = follower.pose();
@@ -134,6 +182,4 @@ public class Robot implements Updateable {
     public Alliance getAlliance() {
         return alliance;
     }
-
-
 }

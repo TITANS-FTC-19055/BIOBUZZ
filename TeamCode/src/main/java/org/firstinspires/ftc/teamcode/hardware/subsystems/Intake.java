@@ -5,7 +5,7 @@ import static com.pedropathing.ivy.commands.Commands.instant;
 
 import androidx.annotation.NonNull;
 
-import com.acmerobotics.dashboard.config.Config;
+import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.ivy.Command;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
@@ -17,7 +17,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
 
-@Config
+@Configurable
 public class Intake {
 
     public enum State {
@@ -32,22 +32,27 @@ public class Intake {
     public static double REVERSE_INTAKE_POWER = -1.0;
     public static double REVERSE_TRANSFER_POWER = -1.0;
 
+    public static double BLOCKER_BLOCK_POSITION = 0;
+    public static double BLOCKER_RELEASE_POSITION = 0.24;
+
     private boolean isFull = false;
     private boolean isEmpty = true;
 
     public static double INTAKE_SENSOR_THRESHOLD_CM = 10.0;
     public static double EXIT_SENSOR_THRESHOLD_CM = 5.0;
 
-    private static final long REVERSE_RESET_DURATION_NS = 200_000_000L;
-    private static final long INTAKE_CONFIRMATION_DURATION_NS = 800_000_000L;
-    private static final long FEED_CONFIRMATION_DURATION_NS = 400_000_000L;
-    private static final long BLOCKER_FEED_DURATION_NS = 500_000_000L;
+    private static long REVERSE_RESET_DURATION_NS = 150_000_000L;
+    private static long INTAKE_CONFIRMATION_DURATION_NS = 500_000_000L;
+    private static long FEED_CONFIRMATION_DURATION_NS = 400_000_000L;
+    private static long BLOCKER_FEED_DURATION_NS = 500_000_000L;
 
-    private static long intakeStartTime = 0;
+    private long intakeStartTime = 0;
     private boolean startedConfirmingFull = false;
+
     private long feedStartTime = 0;
     private long reverseStartTime = 0;
     private boolean startedConfirmingEmpty = false;
+
     private long blockerStartTime = 0;
 
     private final DcMotor intake, transfer;
@@ -75,14 +80,34 @@ public class Intake {
         intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         transfer.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        blocker.setPosition(1);
+        blocker.setPosition(BLOCKER_BLOCK_POSITION);
+    }
+
+    public Command toggleIntaking(){
+        return instant(() -> {
+            if(currentState == State.STOPPED){
+                activate().schedule();
+            } else {
+                stop().schedule();
+            }
+        });
+    }
+
+    public Command toggleReversing(){
+        return instant(() -> {
+            if(currentState == State.STOPPED){
+                reverse().schedule();
+            } else {
+                stop().schedule();
+            }
+        });
     }
 
     public Command activate() {
         return infinite(() -> {
             run(State.INTAKING, INTAKE_POWER, TRANSFER_POWER);
         })
-                //.until(this::isStorageFull)
+                .until(this::isStorageFull)
                 //.unless(this::isStorageFull)
                 .setEnd(interrupted -> halt())
                 .requiring(this);
@@ -102,8 +127,7 @@ public class Intake {
         return infinite(() -> {
             run(State.SHOOTING, INTAKE_POWER, TRANSFER_POWER);
         })
-                //.until(this::isStorageEmpty)
-                //.unless(this::isStorageEmpty)
+                .until(this::isStorageEmpty)
                 .setEnd(interrupted -> halt())
                 .requiring(this);
     }
@@ -119,13 +143,13 @@ public class Intake {
         }
 
         if(currentState != state && state == State.INTAKING){
-            blocker.setPosition(1);
+            blocker.setPosition(BLOCKER_BLOCK_POSITION);
             startedConfirmingFull = false;
         }
 
         if(currentState != state && state == State.SHOOTING){
             blockerStartTime = System.nanoTime();
-            blocker.setPosition(0.745);
+            blocker.setPosition(BLOCKER_RELEASE_POSITION);
             startedConfirmingEmpty = false;
         }
 
@@ -167,6 +191,7 @@ public class Intake {
                     isFull = true;
                     isEmpty = false;
                     startedConfirmingFull = false;
+                    intakeStartTime = 0;
                 }
                 break;
             case SHOOTING:
@@ -182,6 +207,7 @@ public class Intake {
                     isFull = false;
                     isEmpty = true;
                     startedConfirmingEmpty = false;
+                    feedStartTime = 0;
                 }
                 break;
             case OUTTAKING:
@@ -189,6 +215,7 @@ public class Intake {
                     isEmpty = true;
                     isFull = false;
                     startedConfirmingEmpty = true;
+                    reverseStartTime = 0;
                 }
                 break;
         }

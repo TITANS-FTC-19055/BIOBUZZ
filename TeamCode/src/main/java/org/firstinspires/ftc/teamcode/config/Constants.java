@@ -1,9 +1,7 @@
 package org.firstinspires.ftc.teamcode.config;
 
-import com.acmerobotics.dashboard.config.Config;
 import com.pedropathing.math.Pose;
 
-@Config
 public class Constants {
     public static final Pose RED_SCORING_CELL = new Pose(0.0, 0.0);
     public static final Pose RED_AUDIENCE_CELL = new Pose(0.0, 0.0);

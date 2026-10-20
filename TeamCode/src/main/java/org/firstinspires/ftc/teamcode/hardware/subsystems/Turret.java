@@ -5,8 +5,8 @@ import static com.pedropathing.ivy.commands.Commands.instant;
 
 import androidx.annotation.NonNull;
 
-import com.acmerobotics.dashboard.config.Config;
 import com.arcrobotics.ftclib.controller.PIDController;
+import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.hardware.CRServo;
@@ -16,65 +16,61 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
 
 import java.util.function.Supplier;
 
-@Config
+@Configurable
 public class Turret {
     private final CRServo servo1, servo2;
     private final DcMotorEx encoder;
 
-    public static double kP = 0.017, kI = 0.00005, kD = 0.00076;
-    //Placeholder
-    public static  double GEAR_RATIO = 80.0/30.0;
-    public static double TICKS_PER_DEGREE = 8192.0/360.0 * GEAR_RATIO;
+    public static double kPLeft = 0.02, kILeft = 0.00007, kDLeft = 0.00065;
+    public static double kPRight = 0.025, kIRight = 0.0001, kDRight = 0.0008;
 
-    // Placeholder
-    public static double MIN_ANGLE = -180;
-    public static double MAX_ANGLE = 180;
+    public double GEAR_RATIO = 80.0/30.0;
+    public double TICKS_PER_DEGREE = 8192.0/360.0 * GEAR_RATIO;
+
+    public double MIN_ANGLE = -140;
+    public double MAX_ANGLE = 140;
 
     private double targetAngle = 0;
     private double currentAngle = 0;
 
-    private double lastKp = kP, lastKi = kI, lastKd = kD;
-
     private final PIDController controller;
+
+
 
     public Turret(@NonNull HardwareMap hwmap){
         servo1 = hwmap.get(CRServo.class, HardwareConfig.hrot1);
         servo2 = hwmap.get(CRServo.class, HardwareConfig.hrot2);
 
-        servo1.setDirection(DcMotorSimple.Direction.REVERSE);
-        servo2.setDirection(DcMotorSimple.Direction.REVERSE);
-
-        encoder = hwmap.get(DcMotorEx.class, HardwareConfig.RB);
+        encoder = hwmap.get(DcMotorEx.class, HardwareConfig.RF);
         encoder.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
         encoder.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
 
-        controller = new PIDController(kP, kI, kD);
+        controller = new PIDController(kPLeft, kILeft, kDLeft);
     }
 
     public void updateCurrentAngle(){
         currentAngle = encoder.getCurrentPosition() / TICKS_PER_DEGREE;
     }
 
-    private void checkTuningParameters() {
-        if (kP != lastKp || kI != lastKi || kD != lastKd) {
-            controller.setPID(kP, kI, kD);
-            controller.reset();
-            lastKp = kP;
-            lastKi = kI;
-            lastKd = kD;
-        }
+    private void setServoPower(double power){
+        servo1.setPower(power);
+        servo2.setPower(power);
     }
 
     private void rotateToAngle(double angle){
         updateCurrentAngle();
-        checkTuningParameters();
 
         targetAngle = Range.clip(angle, MIN_ANGLE, MAX_ANGLE);
+
+        if(targetAngle - currentAngle > 0){
+            controller.setPID(kPLeft, kILeft, kDLeft);
+        } else {
+            controller.setPID(kPRight, kIRight, kDRight);
+        }
 
         if (isAtTargetAngle(1.0)) {
             setServoPower(0);
@@ -139,22 +135,14 @@ public class Turret {
     }
 
     public void debug(Telemetry t){
+        updateCurrentAngle();
         t.addData("Current Angle", currentAngle);
         t.addData("Target Angle", targetAngle);
         t.addData("Angle Error", getAngleError());
         t.addData("Is At Target Angle", isAtTargetAngle(2.0));
-        t.addLine("--------------------------------------------------");
-        t.addData("kP (dashboard)", kP);
-        t.addData("kI (dashboard)", kI);
-        t.addData("kD (dashboard)", kD);
-        t.addData("kP (controller)", controller.getP());
-        t.addData("kI (controller)", controller.getI());
-        t.addData("kD (controller)", controller.getD());
+        t.addData("kP", controller.getP());
+        t.addData("kI", controller.getI());
+        t.addData("kd", controller.getD());
         t.addData("power", servo1.getPower());
-    }
-
-    private void setServoPower(double power){
-        servo1.setPower(power);
-        servo2.setPower(power);
     }
 }
