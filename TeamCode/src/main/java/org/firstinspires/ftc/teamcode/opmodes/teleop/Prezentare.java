@@ -31,6 +31,10 @@ public class Prezentare extends OpMode {
 
     double currentTurretAngle = 0;
 
+    double shootStart, shootEnd;
+
+
+
     @Override
     public void init() {
         drivetrain = new Drivetrain(hardwareMap, false);
@@ -52,6 +56,7 @@ public class Prezentare extends OpMode {
         if(controller.circle.isPressed()) intake.toggleReversing().schedule();
 
         if(controller.cross.isPressed()) {
+            shootStart = System.currentTimeMillis();
             parallel(
                     shooter.spin(() -> 1500.0),
                     sequential(
@@ -60,6 +65,7 @@ public class Prezentare extends OpMode {
                     )
             )
                     .until(() -> intake.isStorageEmpty())
+                    .setEnd(interupt -> shootEnd = System.currentTimeMillis())
                     .schedule();
         }
 
@@ -74,9 +80,13 @@ public class Prezentare extends OpMode {
             turret.goToAngle(currentTurretAngle).schedule();
         }
 
+        intake.update();
 
         Scheduler.execute();
 
+        telemetry.addData("Shoot time", shootEnd - shootStart);
+
+        intake.debug(telemetry);
         shooter.debug(telemetry);
 
         telemetry.update();

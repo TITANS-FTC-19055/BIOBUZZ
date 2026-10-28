@@ -36,6 +36,8 @@ public class TestTureta extends OpMode {
         if(controller.triangle.isPressed()) turret.goToAngle(targetAngle).schedule();
         if(controller.cross.isPressed()) turret.goToAngle(0).schedule();
 
+        turret.update();
+
         turret.debug(telemetry);
 
         Scheduler.execute();

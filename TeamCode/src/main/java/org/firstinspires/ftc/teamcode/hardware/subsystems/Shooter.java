@@ -29,7 +29,7 @@ public class Shooter {
     public static double ks = 0.017;
     public static double kv = 0.000445;
     public static double ka = 0;
-    public static double kp = 0.0002;
+    public static double kp = 0.001;
     public static double nominalVoltage = 12.0;
 
     private double targetVelocity = 0;
@@ -61,7 +61,7 @@ public class Shooter {
         feedforward = new SimpleMotorFeedforward(ks, kv, ka);
     }
 
-    private void refresh() {
+    public void refresh() {
         if (voltageSensor != null) {
             double v = voltageSensor.getVoltage();
             if (v > 1.0) {
@@ -99,7 +99,7 @@ public class Shooter {
             targetVelocity = targetVelocitySupplier.get();
             update();
         })
-                .setEnd(endCondition -> setMotorPower(0))
+                .setEnd(endCondition -> halt())
                 .requiring(this);
     }
 
@@ -107,12 +107,10 @@ public class Shooter {
         return Command.build().setDone(() -> isAtTargetVelocity(50.0));
     }
 
-    public Command stop() {
-        return instant(() -> {
+    public void halt() {
             targetVelocity = 0;
             setMotorPower(0);
             controller.reset();
-        }).requiring(this);
     }
 
     public double getTargetVelocity() {
@@ -124,12 +122,13 @@ public class Shooter {
     }
 
     public boolean isAtTargetVelocity(double error) {
-        return Math.abs(currentVelocity - targetVelocity) <= error;
+        return targetVelocity > 0 && currentVelocity >= targetVelocity - error;
     }
 
     public void debug(Telemetry telemetry){
         telemetry.addData("Target Velocity", targetVelocity);
         telemetry.addData("Current Velocity", currentVelocity);
+        telemetry.addData("Erorr", Math.abs(currentVelocity - targetVelocity));
         telemetry.addData("Voltage", voltage);
         telemetry.addData("Boost Power", boostPower);
         telemetry.addData("Motor Power", calculateMotorPower());

@@ -12,13 +12,15 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.config.HardwareConfig;
+import org.firstinspires.ftc.teamcode.lib.interfaces.Updateable;
 
 @Configurable
-public class Intake {
+public class Intake implements Updateable {
 
     public enum State {
         INTAKING,
@@ -35,33 +37,25 @@ public class Intake {
     public static double BLOCKER_BLOCK_POSITION = 0;
     public static double BLOCKER_RELEASE_POSITION = 0.24;
 
-    private boolean isFull = false;
-    private boolean isEmpty = true;
-
-    public static double INTAKE_SENSOR_THRESHOLD_CM = 10.0;
+    public static double INTAKE_SENSOR_THRESHOLD_CM = 5.0;
     public static double EXIT_SENSOR_THRESHOLD_CM = 5.0;
 
-    private static long REVERSE_RESET_DURATION_NS = 150_000_000L;
-    private static long INTAKE_CONFIRMATION_DURATION_NS = 500_000_000L;
-    private static long FEED_CONFIRMATION_DURATION_NS = 400_000_000L;
-    private static long BLOCKER_FEED_DURATION_NS = 500_000_000L;
-
-    private long intakeStartTime = 0;
-    private boolean startedConfirmingFull = false;
-
-    private long feedStartTime = 0;
-    private long reverseStartTime = 0;
-    private boolean startedConfirmingEmpty = false;
-
-    private long blockerStartTime = 0;
+    public static double FULL_CONFIRM_MS = 150;     // pollen on BOTH sensors
+    public static double EMPTY_CONFIRM_MS = 300;    // pollen on NEITHER sensor
+    public static double BLOCKER_OPEN_MS = 100;     // wait for the blocker before feeding
 
     private final DcMotor intake, transfer;
     private final DistanceSensor intakeSensor, exitSensor;
     private final Servo blocker;
 
+    private final ElapsedTime fullTimer = new ElapsedTime();
+    private final ElapsedTime emptyTimer = new ElapsedTime();
+    private final ElapsedTime stateTimer = new ElapsedTime();
+
     private State currentState = State.STOPPED;
-    private boolean intakeTriggered = false;
-    private boolean exitTriggered = false;
+
+    private boolean intakeTriggered, exitTriggered;
+    private boolean isFull, isEmpty;
 
     public Intake(@NonNull HardwareMap hwmap) {
         intake = hwmap.get(DcMotor.class, HardwareConfig.intake);
@@ -108,7 +102,6 @@ public class Intake {
             run(State.INTAKING, INTAKE_POWER, TRANSFER_POWER);
         })
                 .until(this::isStorageFull)
-                //.unless(this::isStorageFull)
                 .setEnd(interrupted -> halt())
                 .requiring(this);
     }
@@ -117,8 +110,7 @@ public class Intake {
         return infinite(() -> {
             run(State.OUTTAKING, REVERSE_INTAKE_POWER, REVERSE_TRANSFER_POWER);
         })
-                //.unless(this::isStorageEmpty)
-                //.until(this::isStorageEmpty)
+                .until(this::isStorageEmpty)
                 .setEnd(interrupted -> halt())
                 .requiring(this);
     }
@@ -132,95 +124,52 @@ public class Intake {
                 .requiring(this);
     }
 
+    public Command continousFeedToShooter() {
+        return infinite(() -> {
+            run(State.SHOOTING, INTAKE_POWER, TRANSFER_POWER);
+        })
+                .setEnd(interrupted -> halt())
+                .requiring(this);
+    }
+
     public Command stop() {
         return instant(this::halt).requiring(this);
     }
 
     private void run(State state, double intakePow, double transferPow) {
-        if(currentState != state && state == State.OUTTAKING){
-            reverseStartTime = System.nanoTime();
-            startedConfirmingEmpty = false;
+        if(currentState != state){
+            currentState = state;
+            stateTimer.reset();
+            blocker.setPosition(state == State.SHOOTING
+                    ? BLOCKER_RELEASE_POSITION
+                    : BLOCKER_BLOCK_POSITION);
         }
 
-        if(currentState != state && state == State.INTAKING){
-            blocker.setPosition(BLOCKER_BLOCK_POSITION);
-            startedConfirmingFull = false;
-        }
+        boolean blockerOpening = state == State.SHOOTING && stateTimer.milliseconds() < BLOCKER_OPEN_MS;
 
-        if(currentState != state && state == State.SHOOTING){
-            blockerStartTime = System.nanoTime();
-            blocker.setPosition(BLOCKER_RELEASE_POSITION);
-            startedConfirmingEmpty = false;
-        }
-
-        currentState = state;
-
-        if((System.nanoTime() - blockerStartTime < BLOCKER_FEED_DURATION_NS) && state == State.SHOOTING){
-          return;
-        }
-
-        update();
-
-        intake.setPower(intakePow);
-        transfer.setPower(transferPow);
+        intake.setPower(blockerOpening ? 0 : intakePow);
+        transfer.setPower(blockerOpening ? 0 : transferPow);
     }
 
     private void halt() {
         intake.setPower(0);
         transfer.setPower(0);
+        blocker.setPosition(BLOCKER_BLOCK_POSITION);
         currentState = State.STOPPED;
     }
 
+    @Override
     public void update() {
-        long now = System.nanoTime();
+        double intakeCm = intakeSensor.getDistance(DistanceUnit.CM);
+        double exitCm = exitSensor.getDistance(DistanceUnit.CM);
+        intakeTriggered = intakeCm < INTAKE_SENSOR_THRESHOLD_CM;
+        exitTriggered = exitCm < EXIT_SENSOR_THRESHOLD_CM;
 
-        boolean newIntake = intakeSensor.getDistance(DistanceUnit.CM) < INTAKE_SENSOR_THRESHOLD_CM;
-        boolean newExit   = exitSensor.getDistance(DistanceUnit.CM)   < EXIT_SENSOR_THRESHOLD_CM;
+        if(!(intakeTriggered && exitTriggered)) fullTimer.reset();
+        if(intakeTriggered || exitTriggered) emptyTimer.reset();
 
-        switch (currentState) {
-            case INTAKING:
-                if(newIntake && intakeTriggered && !startedConfirmingFull){
-                    intakeStartTime = System.nanoTime();
-                    startedConfirmingFull = true;
-                } else if(!newIntake && startedConfirmingFull){
-                    intakeStartTime = 0;
-                    startedConfirmingFull = false;
-                }
-
-                if(startedConfirmingFull && (now - intakeStartTime >= INTAKE_CONFIRMATION_DURATION_NS)){
-                    isFull = true;
-                    isEmpty = false;
-                    startedConfirmingFull = false;
-                    intakeStartTime = 0;
-                }
-                break;
-            case SHOOTING:
-                if(!newExit && !exitTriggered && !startedConfirmingEmpty){
-                    feedStartTime = System.nanoTime();
-                    startedConfirmingEmpty = true;
-                } else if(newExit && startedConfirmingEmpty){
-                    feedStartTime = 0;
-                    startedConfirmingEmpty = false;
-                }
-
-                if(startedConfirmingEmpty && (now - feedStartTime >= FEED_CONFIRMATION_DURATION_NS)){
-                    isFull = false;
-                    isEmpty = true;
-                    startedConfirmingEmpty = false;
-                    feedStartTime = 0;
-                }
-                break;
-            case OUTTAKING:
-                if(!startedConfirmingEmpty && !newIntake && !intakeTriggered && (now - reverseStartTime >= REVERSE_RESET_DURATION_NS)) {
-                    isEmpty = true;
-                    isFull = false;
-                    startedConfirmingEmpty = true;
-                    reverseStartTime = 0;
-                }
-                break;
-        }
-        intakeTriggered = newIntake;
-        exitTriggered = newExit;
+        isFull = fullTimer.milliseconds() > FULL_CONFIRM_MS;
+        isEmpty = emptyTimer.milliseconds() > EMPTY_CONFIRM_MS;
     }
 
     public boolean isStorageFull() { return isFull; }
@@ -236,8 +185,5 @@ public class Intake {
         t.addData("is empty", isStorageEmpty());
         t.addData("is ready to shoot", isReadyToShoot());
         t.addData("state", currentState);
-        t.addData("Intake confirming start time", intakeStartTime);
-        t.addData("Feed confirming start time", feedStartTime);
-        t.addData("Blocker start duration", blockerStartTime);
     }
 }

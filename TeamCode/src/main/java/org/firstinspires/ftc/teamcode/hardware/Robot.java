@@ -12,6 +12,7 @@ import com.pedropathing.drivetrain.DrivePowers;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.ManualDrive;
 import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -36,8 +37,9 @@ public class Robot implements Updateable {
     public final Drivetrain drivetrain;
 
     public Alliance alliance = Alliance.RED;
-    public Pose closestCell = null;
-    public double targetRpm = 0;
+    public Cell closestCell = null;
+
+    private boolean continousShooting = false;
 
     public Robot(@NonNull HardwareMap hardwareMap){
         this(hardwareMap, OpModeStorage.autoEndPose);
@@ -45,7 +47,8 @@ public class Robot implements Updateable {
 
     public Robot(@NonNull HardwareMap hardwareMap, Pose startingPose) {
         follower = Constants.create(hardwareMap);
-        if(startingPose != null && follower != null){
+
+        if(startingPose != null){
             follower.setPose(startingPose);
             alliance = determineAllianceFromPose(startingPose);
         }
@@ -56,7 +59,7 @@ public class Robot implements Updateable {
         drivetrain = new Drivetrain(hardwareMap, true);
     }
 
-    public void drivePedro(double forward, double strafe, double rotate){
+    public void driveFieldCentric(double forward, double strafe, double rotate){
         if(follower == null) return;
         DrivePowers powers = ManualDrive.fieldCentric(
                 forward,
@@ -67,12 +70,29 @@ public class Robot implements Updateable {
         ManualDrive.driveOrHold(follower, powers);
     }
 
+    public void driveRobotCentric(double forward, double strafe, double rotate){
+        if(follower == null) return;
+        DrivePowers powers = new DrivePowers(forward, strafe, rotate);
+        ManualDrive.driveOrHold(follower, powers);
+    }
+
     public void shoot(){
         shootSequence().schedule();
     }
     public void shootWithTracking(){
         shootSequenceWithTracking().schedule();
     }
+    public void shootWithTracking(Pose trackPose){
+        shootSequenceWithTracking(trackPose).schedule();
+    }
+
+    public void toggleContinousShootWithTracking(Pose trackPose){
+        continousShooting = !continousShooting;
+        if(continousShooting){
+            continousShootSequenceWithTracking(trackPose).schedule();
+        }
+    }
+
 
     public void toggleIntake(){
         intake.toggleIntaking().schedule();
@@ -105,7 +125,7 @@ public class Robot implements Updateable {
                         shooter.waitUntilReady(),
                         intake.feedToShooter()
                 )
-        );
+        ).until(intake::isStorageEmpty);
     }
 
     public Command shootSequenceWithTracking(){
@@ -118,10 +138,33 @@ public class Robot implements Updateable {
                         intake.feedToShooter()
                 )
 
-        );
+        ).until(intake::isStorageEmpty);
+    }
+    public Command shootSequenceWithTracking(Pose trackPose){
+        return parallel(
+                shooter.spin(this::calculateTargetRpm),
+                turret.trackFieldPose(() -> trackPose, follower::pose),
+                sequential(
+                        shooter.waitUntilReady(),
+                        turret.waitUntilReady(),
+                        intake.feedToShooter()
+                )
+
+        ).until(intake::isStorageEmpty);
     }
 
+    public Command continousShootSequenceWithTracking(Pose trackPose){
+        return parallel(
+                shooter.spin(this::calculateTargetRpm),
+                turret.trackFieldPose(() -> trackPose, follower::pose),
+                sequential(
+                        shooter.waitUntilReady(),
+                        turret.waitUntilReady(),
+                        intake.continousFeedToShooter()
+                )
 
+        ).until(() -> !continousShooting);
+    }
 
     private Cell getClosestCell(){
         Pose currentPose = follower.pose();
@@ -160,20 +203,25 @@ public class Robot implements Updateable {
 
     @Override
     public void update() {
-        if(follower != null) {
-            follower.update();
-        }
+        if(follower != null) follower.update();
+        intake.update();
+        if(follower!= null) turret.update(Math.toDegrees(follower.velocity().omega));
+        closestCell = getClosestCell();
     }
 
     public void debug(Telemetry t){
         t.addData("X:", follower.pose().x());
         t.addData("Y:", follower.pose().y());
-        t.addData("Heading:", follower.pose().heading());
+        t.addData("Heading:", Math.toDegrees(follower.pose().heading()));
         t.addLine("--------------------------------------------------");
         t.addData("Turret Angle:", turret.getCurrentAngle());
+        t.addData("Is at traget angle", turret.isAtTargetAngle(5.0));
         t.addLine("--------------------------------------------------");
-        t.addData("Alliance:", getAlliance());
-        t.addData("Closest Cell:", getClosestCell());
+        t.addData("Shooter velocity", shooter.getCurrentVelocity());
+        t.addData("Is at target velocity", shooter.isAtTargetVelocity(50));
+        t.addLine("--------------------------------------------------");
+        t.addData("Alliance:", alliance);
+        t.addData("Closest Cell:", closestCell);
     }
 
     public void setAlliance(Alliance alliance){

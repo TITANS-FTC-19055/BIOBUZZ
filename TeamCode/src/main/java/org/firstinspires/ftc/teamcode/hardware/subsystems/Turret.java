@@ -25,8 +25,11 @@ public class Turret {
     private final CRServo servo1, servo2;
     private final DcMotorEx encoder;
 
-    public static double kPLeft = 0.02, kILeft = 0.00007, kDLeft = 0.00065;
-    public static double kPRight = 0.025, kIRight = 0.0001, kDRight = 0.0008;
+    public static double kP = 0.0155, kD = 0.00058;
+    public static double kS = 0.06;          // smallest power that reliably moves the turret
+    public static double kOmega = 0.0;       // power per deg/s of robot rotation
+    public static double DEADBAND_DEG = 0.5; // kS switches off inside this error
+    public static double MAX_POWER = 1.0;    // lower (e.g. 0.6) to soften big steps
 
     public double GEAR_RATIO = 80.0/30.0;
     public double TICKS_PER_DEGREE = 8192.0/360.0 * GEAR_RATIO;
@@ -36,10 +39,12 @@ public class Turret {
 
     private double targetAngle = 0;
     private double currentAngle = 0;
+    private double robotOmega = 0;
 
     private final PIDController controller;
 
-
+    private double relativeTarget = 0;
+    private double fieldTarget = 0;
 
     public Turret(@NonNull HardwareMap hwmap){
         servo1 = hwmap.get(CRServo.class, HardwareConfig.hrot1);
@@ -49,11 +54,25 @@ public class Turret {
         encoder.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
         encoder.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
 
-        controller = new PIDController(kPLeft, kILeft, kDLeft);
+        controller = new PIDController(kP, 0, kD);
     }
 
-    public void updateCurrentAngle(){
+    public void update(){
+        update(0);
+    }
+
+    public void update(double degPerSec) {
         currentAngle = encoder.getCurrentPosition() / TICKS_PER_DEGREE;
+        robotOmega = degPerSec;
+        double error = targetAngle - currentAngle;
+
+        controller.setPID(kP, 0, kD);
+        double pid = controller.calculate(currentAngle, targetAngle);
+        double ks  = Math.abs(error) > DEADBAND_DEG ? Math.signum(error) * kS : 0;
+        double ff  = -kOmega * robotOmega;
+
+        double power = Range.clip(pid, -MAX_POWER, MAX_POWER) + ks + ff;
+        setServoPower(Range.clip(power, -1.0, 1.0));
     }
 
     private void setServoPower(double power){
@@ -61,25 +80,8 @@ public class Turret {
         servo2.setPower(power);
     }
 
-    private void rotateToAngle(double angle){
-        updateCurrentAngle();
-
+    private void rotateToAngle(double angle) {
         targetAngle = Range.clip(angle, MIN_ANGLE, MAX_ANGLE);
-
-        if(targetAngle - currentAngle > 0){
-            controller.setPID(kPLeft, kILeft, kDLeft);
-        } else {
-            controller.setPID(kPRight, kIRight, kDRight);
-        }
-
-        if (isAtTargetAngle(1.0)) {
-            setServoPower(0);
-            return;
-        }
-
-        double pidPower = controller.calculate(currentAngle, targetAngle);
-
-        setServoPower(Range.clip(pidPower, -1.0, 1.0));
     }
 
     public Command goToAngle(Supplier<Double> angleSupplier) {
@@ -97,11 +99,47 @@ public class Turret {
         return infinite(() -> {
             Pose t = target.get(), r = robot.get();
 
-            double fieldTarget = Math.atan2(t.y() - r.y(), t.x() - r.x());
-            double relativeTarget = fieldTarget - r.heading();
+            fieldTarget = Math.atan2(t.y() - r.y(), t.x() - r.x());
+            relativeTarget = normalizeRadians(fieldTarget - r.heading());
 
-            rotateToAngle(-Math.toDegrees(relativeTarget));
+            rotateToAngle(chooseReachableAngle(Math.toDegrees(relativeTarget)));
         }).requiring(this);
+    }
+
+    private static double normalizeRadians(double angle) {
+        while (angle > Math.PI)   angle -= 2 * Math.PI;
+        while (angle <= -Math.PI) angle += 2 * Math.PI;
+        return angle;
+    }
+
+    private double chooseReachableAngle(double angleDeg) {
+        double best = angleDeg;
+        double bestCost = Double.MAX_VALUE;
+
+        for (int k = -1; k <= 1; k++) {
+            double candidate = angleDeg + 360.0 * k;
+            if (candidate < MIN_ANGLE || candidate > MAX_ANGLE) continue;
+
+            double cost = Math.abs(candidate - currentAngle);
+            if (cost < bestCost) {
+                bestCost = cost;
+                best = candidate;
+            }
+        }
+
+        if (bestCost == Double.MAX_VALUE) {
+            // Dead zone: no equivalent angle reachable, clamp to the nearest limit.
+            double wrapped = angleDeg;
+            double distToMin = Math.abs(wrapped - MIN_ANGLE);
+            double distToMax = Math.abs(wrapped - MAX_ANGLE);
+            // Compare using wrapped distance so we pick the physically closer limit
+            distToMin = Math.min(distToMin, 360.0 - distToMin);
+            distToMax = Math.min(distToMax, 360.0 - distToMax);
+            best = distToMin < distToMax ? MIN_ANGLE : MAX_ANGLE;
+        }
+
+        return best;
+
     }
 
     public Command waitUntilReady(double toleranceDegrees) {
@@ -109,7 +147,7 @@ public class Turret {
     }
 
     public Command waitUntilReady() {
-        return waitUntilReady(2.0);
+        return waitUntilReady(5.0);
     }
 
     public Command stop(){
@@ -135,7 +173,6 @@ public class Turret {
     }
 
     public void debug(Telemetry t){
-        updateCurrentAngle();
         t.addData("Current Angle", currentAngle);
         t.addData("Target Angle", targetAngle);
         t.addData("Angle Error", getAngleError());
@@ -143,6 +180,10 @@ public class Turret {
         t.addData("kP", controller.getP());
         t.addData("kI", controller.getI());
         t.addData("kd", controller.getD());
-        t.addData("power", servo1.getPower());
+        t.addData("power servo 1", servo1.getPower());
+        t.addData("power servo 2", servo2.getPower());
+        t.addData("Field Target", Math.toDegrees(fieldTarget));
+        t.addData("Relative Target", Math.toDegrees(relativeTarget));
+        t.addData("Robot Omega", robotOmega);
     }
 }

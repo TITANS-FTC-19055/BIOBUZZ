@@ -36,7 +36,6 @@ public class TunningShooter extends OpMode {
         if(controller.dpadDown.isPressed()) target = 500;
 
 
-        if(controller.cross.isPressed()) shooter.stop().schedule();
         if(controller.square.isPressed()) shooter.spin(() -> target).schedule();
 
         Scheduler.execute();
